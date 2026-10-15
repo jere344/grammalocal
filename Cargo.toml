@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["crates/grammalocald", "crates/grammalocal-cli", "crates/grammalocal-popup"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/jere344/grammalocal"
+homepage = "https://github.com/jere344/grammalocal"
+readme = "README.md"
+keywords = ["grammar", "spellcheck", "languagetool", "french", "linux"]
+categories = ["text-processing", "command-line-utilities"]
+authors = ["Bygourou"]
+description = "Self-hosted French and English grammar checker for Linux"

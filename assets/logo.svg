@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>grammalocal</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+  </defs>
+  <!-- Badge -->
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
+  <!-- Speech bubble -->
+  <path d="M60 58h136a20 20 0 0 1 20 20v76a20 20 0 0 1-20 20h-78l-34 28v-28H60a20 20 0 0 1-20-20V78a20 20 0 0 1 20-20z" fill="#ffffff"/>
+  <!-- Text lines -->
+  <rect x="64" y="84" width="128" height="14" rx="7" fill="#1e3a8a" opacity="0.85"/>
+  <rect x="64" y="110" width="58" height="14" rx="7" fill="#1e3a8a" opacity="0.85"/>
+  <!-- Wavy "error" underline turning into a check mark -->
+  <path d="M64 146q7-9 14 0t14 0t14 0t14 0" fill="none" stroke="#f97316" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M136 132l16 16l38-40" fill="none" stroke="#10b981" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 200" width="760" height="200">
+  <title>grammalocal</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+    <linearGradient id="txt" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+  </defs>
+  <!-- Icon (same as logo.svg, scaled to 168 px) -->
+  <g transform="translate(16 16) scale(0.65625)">
+    <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
+    <path d="M60 58h136a20 20 0 0 1 20 20v76a20 20 0 0 1-20 20h-78l-34 28v-28H60a20 20 0 0 1-20-20V78a20 20 0 0 1 20-20z" fill="#ffffff"/>
+    <rect x="64" y="84" width="128" height="14" rx="7" fill="#1e3a8a" opacity="0.85"/>
+    <rect x="64" y="110" width="58" height="14" rx="7" fill="#1e3a8a" opacity="0.85"/>
+    <path d="M64 146q7-9 14 0t14 0t14 0t14 0" fill="none" stroke="#f97316" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M136 132l16 16l38-40" fill="none" stroke="#10b981" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="210" y="112" font-family="Inter, 'Segoe UI', Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif" font-size="84" font-weight="700" fill="url(#txt)" letter-spacing="-1">grammalocal</text>
+  <text x="214" y="152" font-family="Inter, 'Segoe UI', Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif" font-size="26" fill="#64748b">Local French &amp; English grammar checker</text>
+</svg>

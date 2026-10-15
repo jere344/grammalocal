@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Grammalocal
+GenericName=Grammar checker
+Comment=Check French and English grammar locally
+Exec=grammalocal-popup
+Icon=grammalocal
+Terminal=false
+Categories=Utility;TextTools;
+Keywords=grammar;spelling;french;english;languagetool;
+StartupNotify=false
+StartupWMClass=dev.grammalocal.popup
+NoDisplay=true

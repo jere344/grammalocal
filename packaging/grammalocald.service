@@ -1,0 +1,11 @@
+[Unit]
+Description=grammalocald local FR/EN grammar checker
+After=default.target
+
+[Service]
+ExecStart=%h/.local/bin/grammalocald
+Restart=on-failure
+MemoryMax=600M
+
+[Install]
+WantedBy=default.target
