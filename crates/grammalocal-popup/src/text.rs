@@ -34,23 +34,50 @@ pub fn utf16_span_to_chars(text: &str, offset: usize, length: usize) -> Option<(
 
 /// Applies edits from the end of the text towards the start, so earlier indices stay valid.
 /// An edit that overlaps an already applied (later) edit, or that lies outside the text, is skipped.
+#[cfg(test)]
 pub fn apply_edits(text: &str, edits: &[Edit]) -> String {
-    let original_len = text.chars().count();
     let mut chars: Vec<char> = text.chars().collect();
+    for edit in applicable_edits(edits, chars.len()) {
+        chars.splice(edit.start..edit.start + edit.len, edit.replacement.chars());
+    }
+    chars.into_iter().collect()
+}
+
+/// The edits `apply_edits` would apply to a text of `text_len` characters, in the order it
+/// applies them: from the end towards the start, without overlaps.
+pub fn applicable_edits(edits: &[Edit], text_len: usize) -> Vec<&Edit> {
     let mut order: Vec<&Edit> = edits.iter().collect();
     order.sort_by_key(|edit| std::cmp::Reverse(edit.start));
 
-    // Start of the last applied edit. Any further edit must end at or before it.
+    // Start of the last kept edit. Any further edit must end at or before it.
     let mut floor = usize::MAX;
-    for edit in order {
+    order.retain(|edit| {
         let end = edit.start + edit.len;
-        if end > original_len || end > floor {
-            continue;
+        if end > text_len || end > floor {
+            return false;
         }
-        chars.splice(edit.start..end, edit.replacement.chars());
         floor = edit.start;
+        true
+    });
+    order
+}
+
+/// Where a span starting at `start` with `len` characters moves when `removed` characters at
+/// `at` are replaced by `inserted` characters. `None` when the edit touches the span itself.
+pub fn shift_span(
+    start: usize,
+    len: usize,
+    at: usize,
+    removed: usize,
+    inserted: usize,
+) -> Option<usize> {
+    if start + len <= at {
+        Some(start)
+    } else if start >= at + removed {
+        Some(start - removed + inserted)
+    } else {
+        None
     }
-    chars.into_iter().collect()
 }
 
 #[cfg(test)]
@@ -138,6 +165,34 @@ mod tests {
         assert_eq!(apply_edits(text, &[edit(5, 1, "x")]), "abc");
         assert_eq!(apply_edits(text, &[]), "abc");
         assert_eq!(apply_edits(text, &[edit(1, 0, "-")]), "a-bc");
+    }
+
+    #[test]
+    fn spans_before_an_edit_stay_put() {
+        assert_eq!(shift_span(0, 3, 3, 0, 2), Some(0), "insert right after");
+        assert_eq!(shift_span(0, 3, 5, 2, 0), Some(0), "delete further on");
+    }
+
+    #[test]
+    fn spans_after_an_edit_shift_by_the_length_change() {
+        assert_eq!(shift_span(5, 3, 5, 0, 2), Some(7), "insert right before");
+        assert_eq!(
+            shift_span(5, 3, 1, 4, 0),
+            Some(1),
+            "delete ending at the span"
+        );
+        assert_eq!(shift_span(5, 3, 0, 2, 6), Some(9), "replace before");
+    }
+
+    #[test]
+    fn edits_inside_or_across_a_span_drop_it() {
+        assert_eq!(shift_span(5, 3, 6, 0, 1), None, "insert inside");
+        assert_eq!(shift_span(5, 3, 5, 3, 4), None, "replace the span");
+        assert_eq!(
+            shift_span(5, 3, 3, 3, 0),
+            None,
+            "delete overlapping the start"
+        );
     }
 
     #[test]

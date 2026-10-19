@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-10-19
+
+### Changed
+
+- The popup keeps its underlines and suggestions while you edit. They move with the text,
+  and the new check runs in the background and replaces them when it finishes, instead of
+  clearing everything until the check returns.
+- "Accept all" fixes errors in place, so errors without a suggestion stay underlined.
+
+### Fixed
+
+- You can type while a suggestion bubble is open. It no longer takes the keyboard, and it
+  closes when you type, click elsewhere, press Escape or switch windows.
+
 ## [0.1.0] - 2026-10-15
 
 First public release.
@@ -22,4 +36,5 @@ First public release.
 - Application icon and desktop entry, installed under the user's XDG data directory.
 - Release packaging script `packaging/package.sh` and GitHub Actions workflows for CI and releases.
 
+[0.1.1]: https://github.com/jere344/grammalocal/releases/tag/v0.1.1
 [0.1.0]: https://github.com/jere344/grammalocal/releases/tag/v0.1.0

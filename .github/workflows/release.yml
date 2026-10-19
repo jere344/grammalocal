@@ -38,7 +38,12 @@ jobs:
         run: |
           set -eu
           tag="${GITHUB_REF_NAME}"
+          # Release notes are this version's section of CHANGELOG.md.
+          awk -v v="${tag#v}" '
+            /^## \[/ { on = index($0, "## [" v "]") == 1; next }
+            on' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "no CHANGELOG.md section for $tag" >&2; exit 1; }
           gh release create "$tag" dist/*.tar.gz dist/*.sha256 install.sh \
             --title "Grammalocal $tag" \
-            --generate-notes \
+            --notes-file notes.md \
             --verify-tag

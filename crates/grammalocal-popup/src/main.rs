@@ -148,7 +148,10 @@ fn build(
 
     let popover = Popover::new();
     popover.set_parent(&view);
-    popover.set_autohide(true);
+    // Not autohide: an autohide popover is modal and takes the keyboard, so typing would
+    // need a click to dismiss it first. It closes on edits, clicks and Escape instead.
+    popover.set_autohide(false);
+    popover.set_can_focus(false);
 
     let cancel = Button::with_label("Cancel");
     let apply = Button::with_label("Apply");
@@ -189,10 +192,27 @@ fn build(
         finished: Cell::new(false),
     });
 
+    // Edits keep the previous findings, moved along with the text, until the next check
+    // replaces them. Only findings the edit touches are dropped.
+    {
+        let s = state.clone();
+        buffer.connect_insert_text(move |_, at, text| {
+            shift_matches(&s, at.offset() as usize, 0, text.chars().count());
+        });
+    }
+    {
+        let s = state.clone();
+        buffer.connect_delete_range(move |_, a, b| {
+            let (a, b) = (a.offset() as usize, b.offset() as usize);
+            shift_matches(&s, a.min(b), a.abs_diff(b), 0);
+        });
+    }
     {
         let s = state.clone();
         buffer.connect_changed(move |_| {
             if !s.suppress.get() {
+                s.popover.popdown();
+                retag(&s);
                 schedule(&s);
             }
         });
@@ -200,6 +220,14 @@ fn build(
     {
         let s = state.clone();
         lang.connect_selected_notify(move |_| schedule(&s));
+    }
+    {
+        let s = state.clone();
+        window.connect_is_active_notify(move |w| {
+            if !w.is_active() {
+                s.popover.popdown();
+            }
+        });
     }
     {
         let s = state.clone();
@@ -216,7 +244,18 @@ fn build(
     {
         let click = GestureClick::new();
         let s = state.clone();
-        click.connect_pressed(move |_, _, x, y| on_click(&s, x, y));
+        click.connect_pressed(move |g, _, x, y| {
+            // The popover is a child of the view, so presses on its buttons bubble up here.
+            // Handling them would pop it down before the button's `clicked` fires.
+            let on_popover = g
+                .current_event()
+                .and_then(|e| e.surface())
+                .zip(s.popover.surface())
+                .is_some_and(|(a, b)| a == b);
+            if !on_popover {
+                on_click(&s, x, y);
+            }
+        });
         view.add_controller(click);
     }
     {
@@ -224,6 +263,10 @@ fn build(
         keys.set_propagation_phase(gtk4::PropagationPhase::Capture);
         let s = state.clone();
         keys.connect_key_pressed(move |_, key, _, _| match key {
+            gdk::Key::Escape if s.popover.is_visible() => {
+                s.popover.popdown();
+                glib::Propagation::Stop
+            }
             gdk::Key::Escape => {
                 s.app.quit();
                 glib::Propagation::Stop
@@ -326,12 +369,11 @@ async fn load_selection(s: &Rc<State>) {
     }
 }
 
-/// Restarts the debounce timer and clears the marks from the previous text.
+/// Restarts the debounce timer. The previous marks stay visible until the check returns.
 fn schedule(s: &Rc<State>) {
     let gen = s.generation.get() + 1;
     s.generation.set(gen);
-    clear_marks(s);
-    s.status.set_text("Typing…");
+    update_status(s);
     let s2 = s.clone();
     glib::timeout_add_local_once(DEBOUNCE, move || {
         if s2.generation.get() == gen {
@@ -408,9 +450,22 @@ fn update_status(s: &Rc<State>) {
     }
 }
 
-fn clear_marks(s: &Rc<State>) {
-    s.matches.borrow_mut().clear();
-    retag(s);
+/// Keeps findings in step with an edit that replaces `removed` characters at `at` by
+/// `inserted` characters. Runs before the buffer changes, so it must not touch the buffer.
+fn shift_matches(s: &Rc<State>, at: usize, removed: usize, inserted: usize) {
+    if s.suppress.get() {
+        s.matches.borrow_mut().clear();
+        return;
+    }
+    s.matches.borrow_mut().retain_mut(|f| {
+        match text::shift_span(f.start, f.len, at, removed, inserted) {
+            Some(start) => {
+                f.start = start;
+                true
+            }
+            None => false,
+        }
+    });
 }
 
 /// Removes the error tag everywhere, then tags every current finding.
@@ -427,12 +482,6 @@ fn retag(s: &Rc<State>) {
 }
 
 fn on_click(s: &Rc<State>, x: f64, y: f64) {
-    // The popover is a child of the view, so clicks on its buttons bubble up here.
-    // Handling them would pop it down before the button's `clicked` fires. Clicks
-    // outside an open popover are consumed by its autohide, so nothing is lost.
-    if s.popover.is_visible() {
-        return;
-    }
     let (bx, by) = s
         .view
         .window_to_buffer_coords(TextWindowType::Widget, x as i32, y as i32);
@@ -459,12 +508,13 @@ fn on_click(s: &Rc<State>, x: f64, y: f64) {
 }
 
 fn show_popover(s: &Rc<State>, idx: usize, anchor: &gdk::Rectangle) {
-    let (message, suggestions) = {
+    // Findings can move or be replaced while the popover is open, so its buttons refer to
+    // the finding by its span rather than by index.
+    let (message, suggestions, span) = {
         let m = s.matches.borrow();
         let f = &m[idx];
-        (f.message.clone(), f.suggestions.clone())
+        (f.message.clone(), f.suggestions.clone(), (f.start, f.len))
     };
-    let gen = s.generation.get();
 
     let content = GtkBox::new(Orientation::Vertical, 4);
     pad(&content, 8);
@@ -482,9 +532,7 @@ fn show_popover(s: &Rc<State>, idx: usize, anchor: &gdk::Rectangle) {
         let s2 = s.clone();
         btn.connect_clicked(move |_| {
             s2.popover.popdown();
-            if s2.generation.get() == gen {
-                apply_suggestion(&s2, idx, &sug);
-            }
+            apply_suggestion(&s2, span, &sug);
         });
         content.append(&btn);
     }
@@ -494,9 +542,7 @@ fn show_popover(s: &Rc<State>, idx: usize, anchor: &gdk::Rectangle) {
         let s2 = s.clone();
         ignore_btn.connect_clicked(move |_| {
             s2.popover.popdown();
-            if s2.generation.get() == gen {
-                ignore(&s2, idx);
-            }
+            ignore(&s2, span);
         });
     }
     content.append(&ignore_btn);
@@ -506,12 +552,19 @@ fn show_popover(s: &Rc<State>, idx: usize, anchor: &gdk::Rectangle) {
     s.popover.popup();
 }
 
-fn apply_suggestion(s: &Rc<State>, idx: usize, repl: &str) {
-    let span = {
-        let m = s.matches.borrow();
-        m.get(idx).map(|f| (f.start, f.len))
-    };
-    let Some((start, len)) = span else { return };
+/// Index of the current finding covering exactly `span`, if it still exists.
+fn find_span(s: &Rc<State>, span: (usize, usize)) -> Option<usize> {
+    s.matches
+        .borrow()
+        .iter()
+        .position(|f| (f.start, f.len) == span)
+}
+
+fn apply_suggestion(s: &Rc<State>, span: (usize, usize), repl: &str) {
+    if find_span(s, span).is_none() {
+        return;
+    }
+    let (start, len) = span;
     let mut a = s.buffer.iter_at_offset(start as i32);
     let mut b = s.buffer.iter_at_offset((start + len) as i32);
     s.buffer.delete(&mut a, &mut b);
@@ -519,15 +572,8 @@ fn apply_suggestion(s: &Rc<State>, idx: usize, repl: &str) {
     s.buffer.insert(&mut at, repl);
 }
 
-fn ignore(s: &Rc<State>, idx: usize) {
-    let removed = {
-        let mut m = s.matches.borrow_mut();
-        if idx < m.len() {
-            Some(m.remove(idx))
-        } else {
-            None
-        }
-    };
+fn ignore(s: &Rc<State>, span: (usize, usize)) {
+    let removed = find_span(s, span).map(|idx| s.matches.borrow_mut().remove(idx));
     if let Some(f) = removed {
         s.ignored.borrow_mut().insert((f.rule_id, f.matched));
         retag(s);
@@ -551,8 +597,17 @@ fn accept_all_fixes(s: &Rc<State>) {
     if edits.is_empty() {
         return;
     }
-    let fixed = text::apply_edits(&buffer_text(&s.buffer), &edits);
-    s.buffer.set_text(&fixed);
+    // Edit in place rather than resetting the text, so findings without a suggestion stay marked.
+    let len = s.buffer.char_count() as usize;
+    s.buffer.begin_user_action();
+    for edit in text::applicable_edits(&edits, len) {
+        let mut a = s.buffer.iter_at_offset(edit.start as i32);
+        let mut b = s.buffer.iter_at_offset((edit.start + edit.len) as i32);
+        s.buffer.delete(&mut a, &mut b);
+        let mut at = s.buffer.iter_at_offset(edit.start as i32);
+        s.buffer.insert(&mut at, &edit.replacement);
+    }
+    s.buffer.end_user_action();
 }
 
 /// Copies the buffer to the clipboard, hides the window, and keeps the process alive
